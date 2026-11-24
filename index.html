@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mensagens</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--text:#14161a;--muted:#6b7280;--line:#e3e5e9;--accent:#3b82f6;--err:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--card:#1a1d23;--text:#f1f2f4;--muted:#9aa1ad;--line:#2a2e36;--err:#f87171}}
+:root[data-theme="dark"]{--bg:#0f1115;--card:#1a1d23;--text:#f1f2f4;--muted:#9aa1ad;--line:#2a2e36;--err:#f87171}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+main{max-width:440px;margin:0 auto;padding:32px 20px 40px}
+h1{margin:12px 0 4px;font-size:28px;text-align:center}
+.sub{color:var(--muted);text-align:center;margin:0 0 24px}
+.logo{font-size:56px;text-align:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+input,select,textarea{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px}
+input[type=color]{height:48px;padding:4px}
+textarea{resize:none}
+button{font:inherit;cursor:pointer}
+.btn{width:100%;margin-top:16px;padding:14px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:600}
+.link{display:block;margin:16px auto 0;background:none;border:0;color:var(--accent)}
+.out{background:none;border:1px solid var(--line);color:var(--err);margin-top:20px}
+.err{color:var(--err);font-size:14px;min-height:20px;margin:10px 0 0}
+.top{text-align:center;margin-bottom:20px}
+.av{position:relative;width:104px;height:104px;margin:0 auto 12px}
+.av .c{width:104px;height:104px;border-radius:50%;background:var(--accent);color:#fff;font-size:46px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.dot{position:absolute;right:4px;bottom:4px;width:24px;height:24px;border-radius:50%;border:3px solid var(--bg);background:#22c55e}
+.nome{font-size:22px;font-weight:700}
+.user{color:var(--muted)}
+.bio{color:var(--muted);margin-top:6px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<section id="login">
+  <div class="logo">💬</div>
+  <h1>Bem-vindo</h1>
+  <p class="sub" id="sub"></p>
+  <form id="form" class="card" autocomplete="off">
+    <div id="cEmail"><label for="email">E-mail</label><input id="email" type="email" autocapitalize="none"></div>
+    <div id="cUser" hidden><label for="user">Nome de usuário</label><input id="user" autocapitalize="none"></div>
+    <label for="senha">Senha</label><input id="senha" type="password">
+    <p class="err" id="err"></p>
+    <button class="btn" id="go" type="submit"></button>
+    <button class="link" id="alt" type="button"></button>
+  </form>
+</section>
+
+<section id="perfil" hidden>
+  <div class="top">
+    <div class="av"><div class="c" id="avc"></div><div class="dot" id="dot"></div></div>
+    <div class="nome" id="vNome"></div>
+    <div class="user" id="vUser"></div>
+    <div class="bio" id="vBio"></div>
+  </div>
+  <div class="card">
+    <label for="nome">Nome de exibição</label><input id="nome" maxlength="30">
+    <label for="bio">Bio</label><textarea id="bio" rows="2" maxlength="120"></textarea>
+    <label for="status">Status</label>
+    <select id="status">
+      <option value="online">Online</option>
+      <option value="ausente">Ausente</option>
+      <option value="naoperturbe">Não perturbe</option>
+      <option value="invisivel">Invisível</option>
+    </select>
+    <label for="cor">Cor do tema</label><input id="cor" type="color">
+  </div>
+  <button class="btn out" id="sair">Sair da conta</button>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
+<script>
+(function(){
+  var SUPABASE_URL = "https://haiypwqsjiizfdzxfvly.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_7uY0KyqtyJ47ZtLO4wgYqw_bsAhBw_-";
+  var db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  var $ = function(id){ return document.getElementById(id); };
+  var CORES = {online:"#22c55e", ausente:"#eab308", naoperturbe:"#ef4444", invisivel:"#9ca3af"};
+  var usuario = null, cadastro = false, ocupado = false, timer = null;
+
+  function erro(m){ $("err").textContent = m || ""; }
+  function trava(v){ ocupado = v; $("go").disabled = v; }
+
+  function traduz(m){
+    m = (m || "").toLowerCase();
+    if(m.indexOf("invalid login") > -1) return "E-mail ou senha incorretos.";
+    if(m.indexOf("already") > -1) return "Esse e-mail já tem conta.";
+    if(m.indexOf("database error") > -1) return "Esse nome de usuário já está em uso.";
+    if(m.indexOf("confirm") > -1) return "Confirme seu e-mail pelo link que enviamos.";
+    return "Algo deu errado. Tente de novo.";
+  }
+
+  function modo(){
+    $("cUser").hidden = !cadastro;
+    $("go").textContent = cadastro ? "Criar conta" : "Entrar";
+    $("alt").textContent = cadastro ? "Já tem conta? Entrar" : "Não tem conta? Criar agora";
+    $("sub").textContent = cadastro ? "Crie sua conta em segundos" : "Entre para conversar com seus amigos";
+    erro("");
+  }
+
+  function desenhar(){
+    var logado = !!usuario;
+    $("login").hidden = logado;
+    $("perfil").hidden = !logado;
+    if(!logado){ document.documentElement.style.removeProperty("--accent"); return; }
+    document.documentElement.style.setProperty("--accent", usuario.cor);
+    var nome = usuario.nome || "Sem nome";
+    $("avc").textContent = nome.charAt(0).toUpperCase();
+    $("dot").style.background = CORES[usuario.status] || CORES.online;
+    $("vNome").textContent = nome;
+    $("vUser").textContent = "@" + usuario.user;
+    $("vBio").textContent = usuario.bio;
+  }
+
+  function preencher(){
+    $("nome").value = usuario.nome;
+    $("bio").value = usuario.bio;
+    $("status").value = usuario.status;
+    $("cor").value = usuario.cor;
+  }
+
+  async function carregarPerfil(user){
+    var r = await db.from("profiles").select("*").eq("id", user.id).single();
+    if(r.error || !r.data){ erro("Não foi possível carregar o perfil."); return; }
+    var p = r.data;
+    usuario = {id: user.id, user: p.username, nome: p.display_name || "", bio: p.bio || "", status: p.status || "online", cor: p.theme_color || "#3b82f6"};
+    preencher(); desenhar();
+  }
+
+  function agendar(){
+    clearTimeout(timer);
+    timer = setTimeout(function(){
+      db.from("profiles").update({display_name: usuario.nome, bio: usuario.bio, status: usuario.status, theme_color: usuario.cor}).eq("id", usuario.id).then(function(){});
+    }, 600);
+  }
+
+  $("alt").onclick = function(){ cadastro = !cadastro; modo(); };
+
+  $("form").onsubmit = async function(e){
+    e.preventDefault();
+    if(ocupado) return;
+    var em = $("email").value.trim(), senha = $("senha").value, us = $("user").value.trim();
+    if(em.indexOf("@") < 1) return erro("Digite um e-mail válido.");
+    if(senha.length < 6) return erro("A senha precisa ter pelo menos 6 caracteres.");
+    if(cadastro && us.length < 3) return erro("O nome de usuário precisa ter pelo menos 3 letras.");
+    erro(""); trava(true);
+    try{
+      var r;
+      if(cadastro){
+        r = await db.auth.signUp({email: em, password: senha, options: {data: {username: us}}});
+        if(!r.error && !r.data.session){
+          cadastro = false; modo();
+          erro("Conta criada! Confirme pelo link enviado ao seu e-mail e depois entre.");
+          trava(false); return;
+        }
+      } else {
+        r = await db.auth.signInWithPassword({email: em, password: senha});
+      }
+      if(r.error){ erro(traduz(r.error.message)); }
+      else if(r.data.session){ $("senha").value = ""; await carregarPerfil(r.data.user); }
+    }catch(x){ erro("Sem conexão. Tente de novo."); }
+    trava(false);
+  };
+
+  $("nome").oninput = function(){ usuario.nome = this.value; desenhar(); agendar(); };
+  $("bio").oninput = function(){ usuario.bio = this.value; desenhar(); agendar(); };
+  $("status").onchange = function(){ usuario.status = this.value; desenhar(); agendar(); };
+  $("cor").oninput = function(){ usuario.cor = this.value; desenhar(); agendar(); };
+  $("sair").onclick = async function(){ await db.auth.signOut(); usuario = null; $("form").reset(); modo(); desenhar(); };
+
+  modo(); desenhar();
+  db.auth.getSession().then(function(r){ if(r.data.session) carregarPerfil(r.data.session.user); });
+})();
+</script>
+</body>
+</html>
